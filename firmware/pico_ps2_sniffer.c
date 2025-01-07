@@ -58,7 +58,7 @@ WARNING: BULLSHIT CODE X-)
 
 #define BP() __asm("bkpt #1"); // breakpoint via software macro
 
-#define FVER 3
+#define FVER 5
 
 #define RING_BUFF_MAX_ENTRIES 800
 
@@ -782,7 +782,8 @@ const key_table_t *get_make_code(unsigned char new_byte)
     }
 
     int matches = 0, exact_index = -1;
-    const key_table_t *found = match_sequence(parser_state.buffer, parser_state.length, &matches, &exact_index);
+    const key_table_t *found =
+        match_sequence((const unsigned char *)parser_state.buffer, parser_state.length, &matches, &exact_index);
 
     if (found)
     {
@@ -900,7 +901,7 @@ void core1_main()
     unsigned int total_pio_packets = 0;
     unsigned int read_index = 0;
 
-    memset(buffer_keys, 0, sizeof(buffer_keys));
+    memset((void *)buffer_keys, 0, sizeof(buffer_keys));
     memset((void *)&parser_state, 0, sizeof(parser_state));
 
     while (1)
@@ -935,7 +936,7 @@ void core1_main()
     }
 }
 
-void toggle_glitch_detector(void)
+static void toggle_glitch_detector(void)
 {
     volatile static uint offset_kbd_glt = 0;
     volatile static bool last_program_rise = false;
@@ -963,26 +964,28 @@ void toggle_glitch_detector(void)
 
     if (last_program_rise)
     {
-        last_program = &glitch_det_fast_rise_program;
-        offset_kbd_glt = pio_add_program(pio1, last_program);
+        last_program = (pio_program_t *)&glitch_det_fast_rise_program;
+        offset_kbd_glt = pio_add_program(pio1, (const pio_program_t *)last_program);
         c_kbd_glt = glitch_det_fast_fall_program_get_default_config(offset_kbd_glt);
         last_program_rise = false;
     }
     else
     {
-        last_program = &glitch_det_fast_fall_program;
-        offset_kbd_glt = pio_add_program(pio1, last_program);
+        last_program = (pio_program_t *)&glitch_det_fast_fall_program;
+        offset_kbd_glt = pio_add_program(pio1, (const pio_program_t *)last_program);
         c_kbd_glt = glitch_det_fast_rise_program_get_default_config(offset_kbd_glt);
         last_program_rise = true;
     }
 
-    pio_sm_set_consecutive_pindirs(pio1, kbd_glt_sm, CLK_GPIO, 2, false);
-    sm_config_set_in_pins(&c_kbd_glt, CLK_GPIO);
-    sm_config_set_in_shift(&c_kbd_glt, false, true, 32);
-    sm_config_set_jmp_pin(&c_kbd_glt, CLK_GPIO);
+    pio_sm_set_consecutive_pindirs(pio1, kbd_glt_sm, CLK_GPIO, 1, false);
+    sm_config_set_in_pins((pio_sm_config *)&c_kbd_glt, CLK_GPIO);
+    sm_config_set_in_shift((pio_sm_config *)&c_kbd_glt, false, true, 32);
+    sm_config_set_jmp_pin((pio_sm_config *)&c_kbd_glt, CLK_GPIO);
+    sm_config_set_fifo_join((pio_sm_config *)&c_kbd_glt, PIO_FIFO_JOIN_RX);
     // 8 MHz
     float div_kbd_glt = clock_get_hz(clk_sys) / 8000000.0;
-    pio_sm_init(pio1, kbd_glt_sm, offset_kbd_glt, &c_kbd_glt);
+    sm_config_set_clkdiv((pio_sm_config *)&c_kbd_glt, div_kbd_glt);
+    pio_sm_init(pio1, kbd_glt_sm, offset_kbd_glt, (pio_sm_config *)&c_kbd_glt);
     pio_sm_set_enabled(pio1, kbd_glt_sm, false);
     pio_sm_clear_fifos(pio1, kbd_glt_sm);
     pio_sm_restart(pio1, kbd_glt_sm);

@@ -393,3 +393,66 @@ glitch_detected:
 no_glitch_detected:
     jmp x--, check_for_glitch           ; 06 If still HIGH, repeat up to 16 times
 .wrap                                   ; Restart program
+
+
+.program rise_counter
+; PIO???, Must run at 125 MHz (each instruction takes 8 ns).
+
+; This program measures the time between a falling edge and the next rising edge
+; on the CLOCK pin by counting instructions. We do the following:
+;   1) Initialize counter to 0xFFFFFFFF
+;   2) Wait for the CLOCK pin to go HIGH, then LOW (i.e., a falling edge).
+;   3) Enter a loop:
+;        - If pin goes HIGH (rising edge), jump to "capture_time".
+;        - Else decrement counter and keep looping until it hits zero.
+;   4) Once the rising edge is detected, we push the current counter.
+;      This value indicates how many loop iterations remained.
+
+; Time Calculation:
+;   - Each PIO instruction takes 8 ns at 125 MHz.
+;   - The loop uses 2 instructions per iteration, so each iteration = 16 ns.
+;   - The final measured time in nanoseconds is (0xFFFFFFFF - x) * 16 ns
+;     (since X started at 0xFFFFFFFF and was decremented each iteration).
+
+; With a 16 ns resolution, this method is not perfect for measuring very short pulses.
+; I have seen PS2-USB adapters with glitches shorter than 16 ns, but it's better than nothing.
+
+; Overclocking RP to 250 MHz can increase the resolution to 8 ns.
+; (Configuring the PIO clock divider to 1).
+
+; AUTOPUSH must be true, 32-bit threshold.
+; IN PIN 0: CLOCK
+; JMP PIN: CLOCK
+.wrap_target
+initialize_counter:
+    mov x, !null            ; 00 X = 0xFFFFFFFF (maximum count value)
+    wait 1 pin, 0           ; 01 Wait until CLOCK pin goes HIGH (start of falling edge detection)
+    wait 0 pin, 0           ; 02 Wait until CLOCK pin goes LOW (falling edge)
+count_loop:
+    jmp pin, capture_time   ; 03 If pin goes HIGH (rising edge), jump to capture
+    jmp x--, count_loop     ; 04 Decrement X and continue looping
+capture_time:
+    in x, 32                ; 05 Push X into the RX FIFO
+.wrap                       ; Restart program
+
+.program fall_counter
+; PIO???, Must run at 125 MHz (each instruction takes 8 ns).
+
+; The same as rise_counter but for detecting the opposite transition.
+
+; AUTOPUSH must be true, 32-bit threshold.
+; IN PIN 0: CLOCK
+; JMP PIN: CLOCK
+.wrap_target
+initialize_counter:
+    mov x, !null            ; 00 X = 0xFFFFFFFF (maximum count value)
+    wait 0 pin, 0           ; 01 Wait until CLOCK pin goes LOW
+    wait 1 pin, 0           ; 02 Then wait until CLOCK pin goes HIGH (rising edge)
+count_loop:
+    jmp pin, check_fall     ; 03 Continue looping while pin is HIGH
+    jmp capture_time        ; 04 If pin goes LOW (falling edge), jump to capture
+check_fall:
+    jmp x--, count_loop     ; 05 Decrement X and continue looping
+capture_time:
+    in x, 32                ; 06 Push X into the RX FIFO
+.wrap                       ; Restart program
