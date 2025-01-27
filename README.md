@@ -8,6 +8,16 @@ I created this project to ensure that all the effort I put into my okhi project 
 
 ![](stuff/withcables.jpg)
 
+# Reporting issues
+
+If you have a PS2-USB adapter that doesn't work with the sniffer, please send me some captures of the device using a logic analyzer or the pico-ps2-diagnostic-tool. This tool is designed to capture and replay signals on a PS/2 interface, specifically targeting the DATA and CLOCK lines:
+
+https://github.com/therealdreg/pico-ps2-diagnostic-tool
+
+![](stuff/originalvsre.png)
+
+ A short pulse was captured on the original CLOCK signal, and the replayed signal successfully reproduced it.
+
 # Download last firmware
 
 Download the latest firmware from the releases section:
@@ -243,6 +253,7 @@ Note: These types of "glitches" do not affect the functionality of the PS2 keybo
 # Related
 
 - https://github.com/therealdreg/pico-usb-sniffer-lite
+- https://github.com/therealdreg/pico-ps2-diagnostic-tool
 
 # Developers
 
