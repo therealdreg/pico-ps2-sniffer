@@ -151,61 +151,69 @@ Connect to serial PORT (COM PORT) with a terminal program (like Putty, Tera Term
 
 To view available COM ports on Windows, open Device Manager and look for the "Ports (COM & LPT)" section.
 
+**The COM port becomes available approximately 4 seconds after connection** (the firmware includes a delay before it starts).
+
 Now, jus type on the PS2 keyboard and see the magic!
 
 ```
-pico-ps2-sniffer started! v3 Build Date Jan  7 2025 07:37:47
+pico-ps2-sniffer started! v3 Build Date Aug 19 2025 21:37:38
 https://github.com/therealdreg/pico-ps2-sniffer
+https://github.com/therealdreg/okhi
 MIT License David Reguera Garcia aka Dreg
-X @therealdreg dreg @rootkit.es
+X @therealdreg dreg@rootkit.es
 ---------------------------------------------------------------
-[0x0000] t:0x000036BB H:0x46
-[0x0001] t:0x00003740 D:0xF0
-[0x0002] t:0x00003742 D:0x23
+DAT_GPIO: 20
+CLK_GPIO: 21
+AUX_D2H_JMP_GPIO: 22
+AUX_H2D_JMP_GPIO: 19
+okhi led GPIO: 26
+okhi USSEL GPIO: 8
+okhi USOE GPIO: 9
+
+[0x0000] t:0x0000469C H:0xED
+[0x0001] t:0x0000469D D:0xFA
+[0x0002] t:0x0000469F H:0x02
+[0x0003] t:0x000046A1 D:0xFA
+[0x0004] t:0x0000580B D:0x23
+MAKE_D --> d
+-----------
+[0x0005] t:0x00005887 D:0xF0
+[0x0006] t:0x0000588B D:0x23
 BREAK_D --> d
 **********
 key break tracker (limit 0x13F bytes): d
 **********
 -----------
-[0x0003] t:0x000038D2 D:0x2D
+[0x0007] t:0x00005DA9 D:0x2D
 MAKE_R --> r
 -----------
-[0x0004] t:0x00003947 D:0xF0
-[0x0005] t:0x00003949 D:0x2D
+[0x0008] t:0x00005E2C D:0xF0
+[0x0009] t:0x00005E30 D:0x2D
 BREAK_R --> r
 **********
 key break tracker (limit 0x13F bytes): dr
 **********
 -----------
-[0x0006] t:0x00003A9D D:0x24
+[0x000A] t:0x000060C6 D:0x24
 MAKE_E --> e
 -----------
-[0x0007] t:0x00003B1A D:0xF0
-[0x0008] t:0x00003B1C D:0x24
+[0x000B] t:0x00006132 D:0xF0
+[0x000C] t:0x00006136 D:0x24
 BREAK_E --> e
 **********
 key break tracker (limit 0x13F bytes): dre
 **********
 -----------
-[0x0009] t:0x00003C69 D:0x34
+[0x000D] t:0x00006663 D:0x34
 MAKE_G --> g
 -----------
-[0x000A] t:0x00003CCA D:0xF0
-[0x000B] t:0x00003CCC D:0x34
+[0x000E] t:0x000066C8 D:0xF0
+[0x000F] t:0x000066CC D:0x34
 BREAK_G --> g
 **********
 key break tracker (limit 0x13F bytes): dreg
 **********
------------
-[0x000C] t:0x00006E7D D:0x58
-MAKE_CAPSLOCK
------------
-[0x000D] t:0x00006E93 H:0xED
-[0x000E] t:0x00006E95 H:0xF4
-[0x000F] t:0x00006E97 H:0x02
-[0x0010] t:0x00006E98 H:0xF4
-[0x0011] t:0x00006EC8 H:0xF0
-[0x0012] t:0x00006ECA H:0x30
+----------
 ```
 
 # Compatible adapters
@@ -236,10 +244,17 @@ Note: These types of "glitches" do not affect the functionality of the PS2 keybo
 
 # GPIO used by the sniffer
 
-- GPIO 20: PS2 DATA
-- GPIO 21: PS2 CLOCK
-- GPIO 19: auxiliary for PIO
-- GPIO 22: auxiliary for PIO
+| PICO PIN | GPIO    | Function | USB Cable Color |
+|:--------:|:-------:|:----------------:|:-----:|
+| GND      | GND     | Ground           | N/A   |
+| 26       | GPIO20  | PS2 DAT          | N/A   |
+| 27       | GPIO21  | PS2 CLK          | N/A   |
+| 29       | GPIO22  | PIO (internal)   | N/A   |
+| 25       | GPIO19  | PIO (internal)   | N/A   |
+| 11       | GPIO8   | okhi (internal)  | N/A   |
+| 12       | GPIO9   | okhi (internal)  | N/A   |
+| 31       | GPIO26  | okhi led         | N/A   |
+
 
 # Learn resources
 
@@ -263,6 +278,12 @@ https://github.com/therealdreg/okhi?tab=readme-ov-file#developers-setup
 
 
 # CHANGELOG
+
+## v3 2025-08-19
+
+- okhi support: led, usb switch, button press...
+- better DOC
+- minor & cosmetic changes
 
 ## v1 2025-01-21
 

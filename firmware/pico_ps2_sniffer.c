@@ -43,22 +43,34 @@ WARNING: BULLSHIT CODE X-)
 #include <string.h>
 
 #include "hardware/clocks.h"
+#include "hardware/flash.h"
 #include "hardware/irq.h"
 #include "hardware/pio.h"
 #include "hardware/pll.h"
+#include "hardware/regs/io_qspi.h"
 #include "hardware/structs/clocks.h"
+#include "hardware/structs/ioqspi.h"
 #include "hardware/structs/pll.h"
+#include "hardware/structs/sio.h"
+#include "hardware/sync.h"
 #include "hardware/timer.h"
+#include "hardware/uart.h"
 #include "hardware/watchdog.h"
 #include "pico/bootrom.h"
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "pico_ps2_sniffer.pio.h"
 #include "tusb.h"
+#include <stdio.h>
+#include <string.h>
 
 #define BP() __asm("bkpt #1"); // breakpoint via software macro
 
-#define FVER 1
+#define RP_LED_GPIO 26 // From PCB v5
+#define USSEL_PIN 8
+#define USOE_PIN 9
+
+#define FVER 3
 
 #define RING_BUFF_MAX_ENTRIES 800
 
@@ -741,6 +753,21 @@ key_table_t keytable[] = { // clang-format off
     KEY_ENTRY(BREAK_WWW_FAVORITES, '\0')
 }; // clang-format on
 
+static void blink_led(int n)
+{
+    gpio_init(RP_LED_GPIO);
+    gpio_set_dir(RP_LED_GPIO, GPIO_OUT);
+    sleep_ms(200);
+    for (int i = 0; i < n; i++)
+    {
+        gpio_put(RP_LED_GPIO, 1);
+        sleep_ms(200);
+        gpio_put(RP_LED_GPIO, 0);
+        sleep_ms(200);
+    }
+    gpio_set_dir(RP_LED_GPIO, GPIO_IN);
+}
+
 static const key_table_t *match_sequence(const unsigned char *buf, size_t len, int *matches, int *exact_index)
 {
     *matches = 0;
@@ -929,8 +956,74 @@ void core1_main()
     }
 }
 
+static bool bootsel_pressed_safely(void)
+{
+    const uint CS_INDEX = 1;
+    uint32_t flags = save_and_disable_interrupts();
+
+    hw_write_masked(&ioqspi_hw->io[CS_INDEX].ctrl, GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    for (volatile int i = 0; i < 1000; ++i)
+    {
+        tight_loop_contents();
+    }
+
+    bool pressed = !(sio_hw->gpio_hi_in & (1u << CS_INDEX));
+
+    hw_write_masked(&ioqspi_hw->io[CS_INDEX].ctrl, GPIO_OVERRIDE_NORMAL << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    restore_interrupts(flags);
+
+    return pressed;
+}
+
+static void boot_press(void)
+{
+    int x = 0;
+    for (int i = 0; i < 500; i++)
+    {
+        if (bootsel_pressed_safely())
+        {
+            x++;
+        }
+    }
+
+    if (x > 90)
+    {
+        /*
+        printf("Bootsel pressed!\r\n");
+        blink_led(5);
+        */
+        reset_usb_boot(0, 0);
+    }
+}
+
 int main(void)
 {
+    boot_press();
+    gpio_init(USSEL_PIN);
+    gpio_set_dir(USSEL_PIN, GPIO_OUT);
+    gpio_put(USSEL_PIN, false);
+    sleep_ms(500);
+
+    gpio_init(USSEL_PIN);
+    gpio_set_dir(USSEL_PIN, GPIO_OUT);
+    gpio_put(USSEL_PIN, false);
+    sleep_ms(500);
+
+    gpio_init(USOE_PIN);
+    gpio_set_dir(USOE_PIN, GPIO_OUT);
+    gpio_put(USOE_PIN, true);
+    sleep_ms(500);
+
+    gpio_put(USSEL_PIN, true);
+    sleep_ms(500);
+
+    gpio_put(USOE_PIN, false);
+    blink_led(3);
+
     // after reset from programmer (SWD), the USB is not working, so, I need to disconnect and connect
     // again to make it work
     sleep_ms(3000);
@@ -943,6 +1036,7 @@ int main(void)
 
     printf("\r\npico-ps2-sniffer started! v%d Build Date %s %s\r\n"
            "https://github.com/therealdreg/pico-ps2-sniffer\r\n"
+           "https://github.com/therealdreg/okhi\r\n"
            "MIT License David Reguera Garcia aka Dreg\r\n"
            "X @therealdreg dreg@rootkit.es\r\n"
            "---------------------------------------------------------------\r\n"
@@ -950,8 +1044,12 @@ int main(void)
            "CLK_GPIO: %d\r\n"
            "AUX_D2H_JMP_GPIO: %d\r\n"
            "AUX_H2D_JMP_GPIO: %d\r\n"
+           "okhi led GPIO: %d\r\n"
+           "okhi USSEL GPIO: %d\r\n"
+           "okhi USOE GPIO: %d\r\n"
            "\r\n",
-           FVER, __DATE__, __TIME__, DAT_GPIO, CLK_GPIO, AUX_D2H_JMP_GPIO, AUX_H2D_JMP_GPIO);
+           FVER, __DATE__, __TIME__, DAT_GPIO, CLK_GPIO, AUX_D2H_JMP_GPIO, AUX_H2D_JMP_GPIO, RP_LED_GPIO, USSEL_PIN,
+           USOE_PIN);
 
     gpio_init(DAT_GPIO);
     gpio_set_dir(DAT_GPIO, GPIO_IN);
